@@ -13,7 +13,7 @@ Bruin automatically handles asset dependencies, ensuring that each layer runs on
 
 Become a Medium member
 Project structure:
-
+```
 zoomcamp/
 ├── .bruin.yml
 ├── README.md
@@ -29,8 +29,9 @@ zoomcamp/
         │   └── trips.sql
         └── reports/
             └── trips_report.sql
+```
 .bruin.yml – Environment Config
-
+```
 default_environment: default
 environments:
     default:
@@ -40,8 +41,9 @@ environments:
                   name: bigquery-default
                   project_id: solar-router-483810-s0
                   service_account_file: /mnt/c/Users/steph/Downloads/solar-router-483810-s0-219c4dace8e9.json
+```
 pipeline.yml – Pipeline Definition
-
+```
 name: nyc_taxi
 schedule: daily
 start_date: "2022-01-01"
@@ -53,11 +55,13 @@ variables:
     items:
       type: string
     default: ["yellow"]
+```
 taxi_types can be overridden at runtime with --var to control which taxi types are ingested.
 start_date determines the starting point for incremental or full-refresh runs.
+
 Ingestion Layer -Trips Python Asset (trips.py)
 The ingestion script fetches NYC taxi data from public Parquet files hosted online:
-
+```
 """@bruin
 name: ingestion.trips
 type: python
@@ -125,11 +129,15 @@ def materialize():
         current_dt += relativedelta(months=1)
 
     return final_df
+```
 Returns a Pandas DataFrame. Bruin handles inserting it into BigQuery.
-Uses append strategy to preserve previously ingested rows.
-Dynamic BRUIN_START_DATE / BRUIN_END_DATE variables allow incremental runs.
-Payment Lookup Asset (payment_lookup.asset.yml)
 
+Uses append strategy to preserve previously ingested rows.
+
+Dynamic BRUIN_START_DATE / BRUIN_END_DATE variables allow incremental runs.
+
+Payment Lookup Asset (payment_lookup.asset.yml)
+```
 name: ingestion.payment_lookup
 type: bq.seed
 connection: bigquery-default  # <--- important
@@ -148,7 +156,11 @@ columns:
     description: "Human-readable payment type"
     checks:
       - name: not_null
+```
+
 Staging Layer — SQL Asset (staging/trips.sql)
+```
+
 /* @bruin
 name: staging.trips
 type: bq.sql
@@ -182,7 +194,10 @@ SELECT
 FROM `solar-router-483810-s0.ingestion.trips`
 WHERE pickup_datetime >= TIMESTAMP('{{ start_datetime }}')
   AND pickup_datetime < TIMESTAMP('{{ end_datetime }}')
+```
 Reports Layer — SQL Asset (reports/trips_report.sql)
+
+```
 /* @bruin
 name: reports.trips_report
 type: bq.sql
@@ -216,7 +231,10 @@ FROM `solar-router-483810-s0.staging.trips`
 WHERE pickup_datetime >= TIMESTAMP('{{ start_datetime }}')
   AND pickup_datetime < TIMESTAMP('{{ end_datetime }}')
 GROUP BY DATE(pickup_datetime)
+
+```
 Running the Pipeline
+```
 # Validate the pipeline
 bruin validate ./pipeline/pipeline.yml
 
@@ -230,11 +248,19 @@ bruin run ./pipeline/pipeline.yml --start-date 2022-01-01 --end-date 2022-02-01
 bruin query --connection bq-prod --query "SELECT COUNT(*) FROM ingestion.trips"
 This module demonstrates a production-ready ETL pipeline using Bruin and BigQuery:
 
+```
+Key lessons
+
 Ingestion: Pulls raw data from external Parquet and CSV sources.
+
 Staging: Cleans, deduplicates, and joins data for downstream use.
+
 Reporting: Aggregates metrics for analytics.
+
 Materialization Strategies: append, time_interval, and table ensure flexible incremental and full-refresh operations.
+
 Data Lineage: Bruin automatically tracks dependencies across all assets.
+
 Here’s my homework solution: https://github.com/stephandoh/zoomcamp54456
 
 Following along with this amazing free course with the link below:
